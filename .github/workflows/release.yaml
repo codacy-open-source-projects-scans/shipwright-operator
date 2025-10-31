@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Desired tag'
+        required: true
+      previous-tag:
+        description: 'Previous tag'
+        required: false
+      git-ref:
+        description: 'Git reference for the release. Use an appropriate release-v* branch, tag, or commit SHA.'
+        required: true
+jobs:
+  release:
+    # if: ${{ github.repository == 'shipwright-io/build' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # To be able to get OIDC ID token to sign images.
+      contents: write  # To be able to update releases.
+      packages: write  # To be able to push images and signatures.
+    env:
+      IMAGE_HOST: ghcr.io
+      IMAGE_NAMESPACE: ${{ github.repository }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.git-ref }}
+        fetch-depth: 0  # Fetch all history, needed for release note generation.
+    # Install tools
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.x
+        cache: true
+        check-latest: true
+    - uses: sigstore/cosign-installer@v3
+    # removes v from release tag for VERSION env variable used by makefile command
+    - name: Derive version
+      env:
+        RELEASE_TAG: ${{ inputs.release }}
+      run: |
+        CLEAN="${RELEASE_TAG#v}"
+        echo "VERSION=${CLEAN}" >> "$GITHUB_ENV"
+    - name: Build Release Images
+      env:
+        REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        REGISTRY_USERNAME: ${{ github.repository_owner }}
+      run:
+        make release
+    - name: Sign released images
+      env:
+        # This enables keyless mode
+        # (https://github.com/sigstore/cosign/blob/main/KEYLESS.md) which signs
+        # images using an ephemeral key tied to the GitHub Actions identity via
+        # OIDC.
+        COSIGN_EXPERIMENTAL: "true"
+      run: |
+        grep -o "ghcr.io[^\"]*" "${GITHUB_WORKSPACE}/_output/olm/bundle/manifests/shipwright-operator.clusterserviceversion.yaml" | uniq | xargs -n 1 cosign sign \
+            -a sha=${{ github.sha }} \
+            -a run_id=${{ github.run_id }} \
+            -a run_attempt=${{ github.run_attempt }} \
+            --yes
+    - name: Build Release Changelog
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PREVIOUS_TAG: ${{ inputs.previous-tag }}
+        REPOSITORY: ${{ github.repository }}
+      run: |
+        "${GITHUB_WORKSPACE}/.github/draft_release_notes.sh"
+    - name: Draft release
+      id: draft_release
+      uses: actions/create-release@v1
+      with:
+        release_name: ${{ inputs.release }}
+        tag_name: ${{ inputs.release }}
+        draft: true
+        prerelease: true
+        body_path: Changes.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
