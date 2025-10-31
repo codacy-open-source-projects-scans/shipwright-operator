@@ -8,7 +8,7 @@ require (
 	github.com/manifestival/controller-runtime-client v0.4.0
 	github.com/manifestival/manifestival v0.7.2
 	github.com/onsi/ginkgo/v2 v2.25.1
-	github.com/onsi/gomega v1.38.1
+	github.com/onsi/gomega v1.38.2
 	github.com/shipwright-io/build v0.17.0
 	github.com/tektoncd/operator v0.77.0
 	gopkg.in/yaml.v2 v2.4.0
