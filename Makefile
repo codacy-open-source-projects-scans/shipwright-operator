@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.19.1
+VERSION ?= 0.20.0
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -70,7 +70,7 @@ endif
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(TAG)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.34
+ENVTEST_K8S_VERSION = 1.36
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -321,6 +321,10 @@ catalog-run: ## Run the operator from a catalog image, using an OLM subscription
 .PHONY: verify-kind
 verify-kind:
 	KUBECTL_BIN=$(KUBECTL_BIN) test/kind/verify-kind.sh
+
+.PHONY: verify-metrics
+verify-metrics: ## Verify the operator's /metrics endpoint enforces authn/authz and serves metrics
+	KUBECTL_BIN=$(KUBECTL_BIN) NAMESPACE=$(CATALOG_NAMESPACE) test/kind/verify-metrics.sh
 
 .PHONY: deploy-kind-registry
 deploy-kind-registry:
